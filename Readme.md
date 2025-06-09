@@ -73,6 +73,10 @@
 4. 必要に応じて180度回転で相手視点に切り替え
 5. 補正済み画像をダウンロード
 
+## GitHub Page
+
+https://kichouji.github.io/board-perspective-corrector/
+
 ## ライセンス
 
 MIT License
