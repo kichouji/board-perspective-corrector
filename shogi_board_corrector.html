@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>囲碁・将棋盤透視補正アプリ</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .upload-area {
+            border: 3px dashed #3498db;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 20px;
+            background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .upload-area:hover {
+            border-color: #2980b9;
+            background: linear-gradient(45deg, #e9ecef, #dee2e6);
+            transform: translateY(-2px);
+        }
+        
+        .upload-area.drag-over {
+            border-color: #27ae60;
+            background: linear-gradient(45deg, #d4edda, #c3e6cb);
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .btn {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+        }
+        
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .canvas-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        canvas {
+            border: 2px solid #34495e;
+            border-radius: 10px;
+            margin: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            background: white;
+        }
+        
+        .instructions {
+            background: linear-gradient(45deg, #fff3cd, #ffeaa7);
+            border: 1px solid #ffeaa7;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 10px rgba(255, 234, 167, 0.3);
+        }
+        
+        .point-counter {
+            font-size: 18px;
+            font-weight: bold;
+            margin: 15px 0;
+            padding: 10px;
+            background: linear-gradient(45deg, #74b9ff, #0984e3);
+            color: white;
+            border-radius: 25px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(116, 185, 255, 0.3);
+        }
+        
+        .result-area {
+            margin-top: 30px;
+            padding: 20px;
+            background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+            border-radius: 10px;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .error {
+            color: #e74c3c;
+            background: linear-gradient(45deg, #ffeaa7, #fab1a0);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            border: 1px solid #e17055;
+            box-shadow: 0 2px 10px rgba(231, 76, 60, 0.2);
+        }
+        
+        .success {
+            color: #27ae60;
+            background: linear-gradient(45deg, #d4edda, #c3e6cb);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            border: 1px solid #27ae60;
+            box-shadow: 0 2px 10px rgba(39, 174, 96, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏁 囲碁・将棋盤透視補正アプリ</h1>
+        
+        <div class="upload-area" id="uploadArea">
+            <p style="font-size: 18px; margin-bottom: 15px;">📷 画像をドラッグ＆ドロップ、ファイル選択、またはクリップボードから貼り付け（Ctrl+V）</p>
+            <input type="file" id="fileInput" accept="image/*">
+            <button class="btn" onclick="document.getElementById('fileInput').click()">
+                📁 ファイルを選択
+            </button>
+        </div>
+        
+        <div class="instructions">
+            <h3>📋 使用方法</h3>
+            <ol>
+                <li>囲碁・将棋盤の画像をアップロード</li>
+                <li>盤の四隅を時計回りにクリック（左上→右上→右下→左下）</li>
+                <li>自動で透視補正された結果を確認</li>
+                <li>必要に応じて補正画像をダウンロード</li>
+            </ol>
+        </div>
+        
+        <div class="point-counter" id="pointCounter" style="display: none;">
+            クリックした点: 0/4
+        </div>
+        
+        <div class="canvas-container">
+            <div>
+                <h3>元画像（盤の四隅をクリックしてください）</h3>
+                <canvas id="originalCanvas" style="display: none;"></canvas>
+            </div>
+        </div>
+        
+        <div class="result-area" style="display: none;" id="resultArea">
+            <h3 style="text-align: center;">補正結果</h3>
+            <div class="canvas-container">
+                <canvas id="resultCanvas"></canvas>
+            </div>
+            <div style="text-align: center;">
+                <button class="btn" id="downloadBtn">
+                    💾 補正画像をダウンロード
+                </button>
+                <button class="btn" id="flipBtn">
+                    🔄 上下反転
+                </button>
+                <button class="btn" onclick="resetApp()">
+                    🔄 リセット
+                </button>
+            </div>
+        </div>
+        
+        <div id="messages"></div>
+    </div>
+
+    <script>
+        let originalImage = null;
+        let clickedPoints = [];
+        let canvas = document.getElementById('originalCanvas');
+        let ctx = canvas.getContext('2d');
+        let resultCanvas = document.getElementById('resultCanvas');
+        let resultCtx = resultCanvas.getContext('2d');
+        let isFlipped = false;
+        
+        // ファイル選択
+        document.getElementById('fileInput').addEventListener('change', handleFile);
+        
+        // ドラッグ&ドロップ
+        const uploadArea = document.getElementById('uploadArea');
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('drag-over');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                loadImage(files[0]);
+            }
+        });
+        
+        // クリップボード貼り付け
+        document.addEventListener('paste', (e) => {
+            const items = e.clipboardData.items;
+            for (let item of items) {
+                if (item.type.indexOf('image') !== -1) {
+                    const file = item.getAsFile();
+                    loadImage(file);
+                    break;
+                }
+            }
+        });
+        
+        // キャンバスクリック
+        canvas.addEventListener('click', handleCanvasClick);
+        
+        // ダウンロードボタン
+        document.getElementById('downloadBtn').addEventListener('click', downloadResult);
+        
+        // 上下反転ボタン
+        document.getElementById('flipBtn').addEventListener('click', flipResult);
+        
+        function handleFile(e) {
+            const file = e.target.files[0];
+            if (file) {
+                loadImage(file);
+            }
+        }
+        
+        function loadImage(file) {
+            if (!file.type.startsWith('image/')) {
+                showMessage('画像ファイルを選択してください。', 'error');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    originalImage = img;
+                    setupCanvas();
+                    resetPoints();
+                    showMessage('画像が読み込まれました。盤の四隅を時計回りにクリックしてください。', 'success');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        function setupCanvas() {
+            const maxWidth = 800;
+            const maxHeight = 600;
+            
+            let { width, height } = originalImage;
+            
+            if (width > maxWidth || height > maxHeight) {
+                const scale = Math.min(maxWidth / width, maxHeight / height);
+                width *= scale;
+                height *= scale;
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            canvas.style.display = 'block';
+            
+            drawOriginalImage();
+        }
+        
+        function drawOriginalImage() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
+            
+            // 既にクリックされた点を描画
+            clickedPoints.forEach((point, index) => {
+                drawPoint(point.x, point.y, index + 1);
+            });
+        }
+        
+        function handleCanvasClick(e) {
+            if (clickedPoints.length >= 4) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            clickedPoints.push({ x, y });
+            drawPoint(x, y, clickedPoints.length);
+            updatePointCounter();
+            
+            if (clickedPoints.length === 4) {
+                performPerspectiveCorrection();
+            }
+        }
+        
+        function drawPoint(x, y, number) {
+            ctx.fillStyle = '#e74c3c';
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3;
+            
+            ctx.beginPath();
+            ctx.arc(x, y, 8, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(number, x, y + 5);
+        }
+        
+        function updatePointCounter() {
+            const counter = document.getElementById('pointCounter');
+            counter.style.display = 'block';
+            counter.textContent = `クリックした点: ${clickedPoints.length}/4`;
+            
+            if (clickedPoints.length === 4) {
+                counter.textContent += ' - 補正中...';
+            }
+        }
+        
+        function performPerspectiveCorrection() {
+            const outputSize = 600;
+            resultCanvas.width = outputSize;
+            resultCanvas.height = outputSize;
+            
+            // Canvas座標を元画像座標に変換
+            const scaleX = originalImage.width / canvas.width;
+            const scaleY = originalImage.height / canvas.height;
+            
+            const srcPoints = clickedPoints.map(point => ({
+                x: point.x * scaleX,
+                y: point.y * scaleY
+            }));
+            
+            const dstPoints = [
+                { x: 0, y: 0 },
+                { x: outputSize, y: 0 },
+                { x: outputSize, y: outputSize },
+                { x: 0, y: outputSize }
+            ];
+            
+            // 透視変換行列を計算
+            const matrix = getPerspectiveTransform(srcPoints, dstPoints);
+            
+            if (matrix) {
+                applyPerspectiveTransform(matrix, outputSize);
+                document.getElementById('resultArea').style.display = 'block';
+                showMessage('透視補正が完了しました！', 'success');
+            } else {
+                showMessage('透視補正に失敗しました。盤の四隅の位置を確認してください。', 'error');
+            }
+        }
+        
+        function getPerspectiveTransform(src, dst) {
+            // 8点対応による透視変換行列の計算
+            const A = [];
+            const b = [];
+            
+            for (let i = 0; i < 4; i++) {
+                A.push([src[i].x, src[i].y, 1, 0, 0, 0, -dst[i].x * src[i].x, -dst[i].x * src[i].y]);
+                A.push([0, 0, 0, src[i].x, src[i].y, 1, -dst[i].y * src[i].x, -dst[i].y * src[i].y]);
+                b.push(dst[i].x, dst[i].y);
+            }
+            
+            // 連立方程式を解く（簡単な実装）
+            try {
+                const solution = solveLinearSystem(A, b);
+                return [
+                    solution[0], solution[1], solution[2],
+                    solution[3], solution[4], solution[5],
+                    solution[6], solution[7], 1
+                ];
+            } catch (e) {
+                return null;
+            }
+        }
+        
+        function solveLinearSystem(A, b) {
+            // ガウス消去法の簡易実装
+            const n = b.length;
+            const matrix = A.map((row, i) => [...row, b[i]]);
+            
+            // 前進消去
+            for (let i = 0; i < n; i++) {
+                let maxRow = i;
+                for (let k = i + 1; k < n; k++) {
+                    if (Math.abs(matrix[k][i]) > Math.abs(matrix[maxRow][i])) {
+                        maxRow = k;
+                    }
+                }
+                [matrix[i], matrix[maxRow]] = [matrix[maxRow], matrix[i]];
+                
+                for (let k = i + 1; k < n; k++) {
+                    const factor = matrix[k][i] / matrix[i][i];
+                    for (let j = i; j <= n; j++) {
+                        matrix[k][j] -= factor * matrix[i][j];
+                    }
+                }
+            }
+            
+            // 後退代入
+            const solution = new Array(n);
+            for (let i = n - 1; i >= 0; i--) {
+                solution[i] = matrix[i][n];
+                for (let j = i + 1; j < n; j++) {
+                    solution[i] -= matrix[i][j] * solution[j];
+                }
+                solution[i] /= matrix[i][i];
+            }
+            
+            return solution;
+        }
+        
+        function applyPerspectiveTransform(matrix, size) {
+            resultCtx.clearRect(0, 0, size, size);
+            
+            // 元画像をcanvasに描画
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = originalImage.width;
+            tempCanvas.height = originalImage.height;
+            tempCtx.drawImage(originalImage, 0, 0);
+            
+            const imageData = tempCtx.getImageData(0, 0, originalImage.width, originalImage.height);
+            const outputData = resultCtx.createImageData(size, size);
+            
+            // 逆変換行列を計算
+            const invMatrix = invertMatrix3x3(matrix);
+            if (!invMatrix) return;
+            
+            // 各ピクセルを変換
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    // 逆変換で元画像の座標を取得
+                    const srcX = (invMatrix[0] * x + invMatrix[1] * y + invMatrix[2]) / 
+                                 (invMatrix[6] * x + invMatrix[7] * y + invMatrix[8]);
+                    const srcY = (invMatrix[3] * x + invMatrix[4] * y + invMatrix[5]) / 
+                                 (invMatrix[6] * x + invMatrix[7] * y + invMatrix[8]);
+                    
+                    if (srcX >= 0 && srcX < originalImage.width && srcY >= 0 && srcY < originalImage.height) {
+                        const srcPixel = getPixelBilinear(imageData, srcX, srcY);
+                        if (srcPixel) {
+                            const dstIndex = (y * size + x) * 4;
+                            outputData.data[dstIndex] = srcPixel[0];     // R
+                            outputData.data[dstIndex + 1] = srcPixel[1]; // G
+                            outputData.data[dstIndex + 2] = srcPixel[2]; // B
+                            outputData.data[dstIndex + 3] = 255;         // A
+                        }
+                    }
+                }
+            }
+            
+            resultCtx.putImageData(outputData, 0, 0);
+        }
+        
+        function invertMatrix3x3(m) {
+            const det = m[0] * (m[4] * m[8] - m[5] * m[7]) -
+                       m[1] * (m[3] * m[8] - m[5] * m[6]) +
+                       m[2] * (m[3] * m[7] - m[4] * m[6]);
+            
+            if (Math.abs(det) < 1e-10) return null;
+            
+            return [
+                (m[4] * m[8] - m[5] * m[7]) / det,
+                (m[2] * m[7] - m[1] * m[8]) / det,
+                (m[1] * m[5] - m[2] * m[4]) / det,
+                (m[5] * m[6] - m[3] * m[8]) / det,
+                (m[0] * m[8] - m[2] * m[6]) / det,
+                (m[2] * m[3] - m[0] * m[5]) / det,
+                (m[3] * m[7] - m[4] * m[6]) / det,
+                (m[1] * m[6] - m[0] * m[7]) / det,
+                (m[0] * m[4] - m[1] * m[3]) / det
+            ];
+        }
+        
+        function getPixelBilinear(imageData, x, y) {
+            const x1 = Math.floor(x);
+            const y1 = Math.floor(y);
+            const x2 = Math.min(x1 + 1, imageData.width - 1);
+            const y2 = Math.min(y1 + 1, imageData.height - 1);
+            
+            if (x1 < 0 || y1 < 0 || x2 >= imageData.width || y2 >= imageData.height) {
+                return null;
+            }
+            
+            const dx = x - x1;
+            const dy = y - y1;
+            
+            const getPixel = (px, py) => {
+                const index = (py * imageData.width + px) * 4;
+                return [
+                    imageData.data[index],
+                    imageData.data[index + 1],
+                    imageData.data[index + 2]
+                ];
+            };
+            
+            const p1 = getPixel(x1, y1);
+            const p2 = getPixel(x2, y1);
+            const p3 = getPixel(x1, y2);
+            const p4 = getPixel(x2, y2);
+            
+            return [
+                Math.round(p1[0] * (1-dx) * (1-dy) + p2[0] * dx * (1-dy) + p3[0] * (1-dx) * dy + p4[0] * dx * dy),
+                Math.round(p1[1] * (1-dx) * (1-dy) + p2[1] * dx * (1-dy) + p3[1] * (1-dx) * dy + p4[1] * dx * dy),
+                Math.round(p1[2] * (1-dx) * (1-dy) + p2[2] * dx * (1-dy) + p3[2] * (1-dx) * dy + p4[2] * dx * dy)
+            ];
+        }
+        
+        function downloadResult() {
+            const link = document.createElement('a');
+            link.download = 'corrected_board.png';
+            link.href = resultCanvas.toDataURL();
+            link.click();
+        }
+        
+        function flipResult() {
+            // キャンバスの中心座標を取得
+            const centerX = resultCanvas.width / 2;
+            const centerY = resultCanvas.height / 2;
+
+            // キャンバスの現在の内容を一時的に保存
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = resultCanvas.width;
+            tempCanvas.height = resultCanvas.height;
+            tempCtx.drawImage(resultCanvas, 0, 0);
+
+            // resultCanvasをクリア
+            resultCtx.clearRect(0, 0, resultCanvas.width, resultCanvas.height);
+
+            // キャンバスの中心を回転軸に設定して180度回転し、画像を描画
+            resultCtx.save(); // 現在の状態を保存
+            resultCtx.translate(centerX, centerY); // 原点を中心に移動
+            resultCtx.rotate(Math.PI); // 180度回転 (πラジアン)
+            resultCtx.translate(-centerX, -centerY); // 原点を元に戻す
+            resultCtx.drawImage(tempCanvas, 0, 0); // 一時保存した画像を描画
+            resultCtx.restore(); // 保存した状態に戻す
+        }
+        
+        function resetApp() {
+            originalImage = null;
+            clickedPoints = [];
+            isFlipped = false;
+            canvas.style.display = 'none';
+            document.getElementById('pointCounter').style.display = 'none';
+            document.getElementById('resultArea').style.display = 'none';
+            document.getElementById('fileInput').value = '';
+            clearMessages();
+        }
+        
+        function resetPoints() {
+            clickedPoints = [];
+            document.getElementById('pointCounter').style.display = 'none';
+            document.getElementById('resultArea').style.display = 'none';
+            if (originalImage) {
+                drawOriginalImage();
+            }
+        }
+        
+        function showMessage(text, type) {
+            const messages = document.getElementById('messages');
+            messages.innerHTML = `<div class="${type}">${text}</div>`;
+        }
+        
+        function clearMessages() {
+            document.getElementById('messages').innerHTML = '';
+        }
+    </script>
+</body>
+</html>
